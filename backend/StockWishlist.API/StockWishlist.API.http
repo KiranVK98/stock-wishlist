@@ -1,0 +1,6 @@
+@StockWishlist.API_HostAddress = http://localhost:5252
+
+GET {{StockWishlist.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
