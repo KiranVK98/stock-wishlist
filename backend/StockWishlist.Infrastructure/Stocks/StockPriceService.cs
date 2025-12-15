@@ -4,26 +4,40 @@ using Microsoft.Extensions.Options;
 
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 
 
 namespace StockWishlist.Infrastructure.Stocks;
 
 public class StockPriceService : IStockPriceService
 {
-    private readonly HttpClient _httpClient;
     private readonly string _apiKey;
-    public StockPriceService(IHttpClientFactory httpClientFactory, IOptions<AlphaVantageSettings> settings)
+
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    private readonly IMemoryCache _cache;
+    public StockPriceService(IHttpClientFactory httpClientFactory, IOptions<AlphaVantageSettings> settings, IMemoryCache cache)
     {
-        _httpClient = httpClientFactory.CreateClient("AlphaVantage");
+        _httpClientFactory = httpClientFactory;
         _apiKey = settings.Value.ApiKey;
+        _cache = cache;
     }
 
 
     public async Task<decimal?> GetLatestPriceAsync(string symbol)
     {
+        symbol = symbol.ToUpper();
+
+        string cacheKey = $"stock_price_{symbol}";
+
+        if(_cache.TryGetValue(cacheKey, out decimal cachedPrice))
+        {
+            return cachedPrice;
+        }
+        var client = _httpClientFactory.CreateClient("AlphaVantage");
         var url = $"query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={_apiKey}";
 
-        var response = await _httpClient.GetAsync(url);
+        var response = await client.GetAsync(url);
 
         if(!response.IsSuccessStatusCode)
             return null;
@@ -41,6 +55,7 @@ public class StockPriceService : IStockPriceService
                 var priceString = priceElement.GetString();
                 if (decimal.TryParse(priceString, out var price))
                 {
+                    _cache.Set(cacheKey, price, TimeSpan.FromSeconds(30));
                     return price;
                 }
             }

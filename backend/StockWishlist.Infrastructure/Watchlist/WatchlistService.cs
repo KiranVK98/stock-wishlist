@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using StockWishlist.Application.Stocks;
 using StockWishlist.Application.Watchlists.DTOs;
 using StockWishlist.Application.Watchlists.Interfaces;
 using StockWishlist.Domain.Entities;
 using StockWishlist.Infrastructure.Data;
+using StockWishlist.Infrastructure.Stocks;
 
 namespace StockWishlist.Infrastructure.Watchlists;
 
@@ -10,9 +12,12 @@ public class WatchlistService : IWatchlistService
 {
     private readonly AppDbContext _context;
 
-    public WatchlistService(AppDbContext context)
+    private readonly IStockPriceService _stockPriceService;
+
+    public WatchlistService(AppDbContext context, IStockPriceService stockPriceService)
     {
         _context = context;
+        _stockPriceService = stockPriceService;
     }
 
     public async Task<Watchlist> CreateWatchlistAsync(CreateWatchlistRequest request)
@@ -51,21 +56,31 @@ public class WatchlistService : IWatchlistService
             return null;
         }
 
-        return new WatchlistDetailsDto
+        var dto = new WatchlistDetailsDto
         {
             WatchlistId = watchList.Id,
             Name = watchList.Name,
-            Stocks = watchList.Items.Select(wi => new WatchlistStockDto
-            {
-                StockId = wi.Stock.Id,
-                Symbol = wi.Stock.Symbol,
-                Name = wi.Stock.Name,
-                Sector = wi.Stock.Sector,
-                TargetPrice = wi.TargetSellPrice,
-                BuyPrice = wi.TargetBuyPrice
-            }).ToList()
-
+            Stocks = new List<WatchlistStockDto>()
         };
+
+        foreach(var item in watchList.Items)
+        {
+            var livePrice = await _stockPriceService.GetLatestPriceAsync(item.Stock.Symbol);
+
+            var stockDto = new WatchlistStockDto
+            {
+                StockId = item.Stock.Id,
+                Symbol = item.Stock.Symbol,
+                Name = item.Stock.Name,
+                Sector = item.Stock.Sector,
+                TargetPrice = item.TargetSellPrice,
+                BuyPrice = item.TargetBuyPrice,
+                LivePrice = livePrice
+            };
+            dto.Stocks.Add(stockDto);
+        }
+
+        return dto;
     }
 
 }

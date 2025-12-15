@@ -19,6 +19,25 @@ public class WatchlistStockDto
 
     public decimal? TargetPrice {get;set;}
     public decimal? BuyPrice {get;set;}
+
+    public decimal? LivePrice {get;set;}
+
+    public decimal? ProfitLoss => 
+        LivePrice.HasValue && BuyPrice.HasValue
+            ? LivePrice - BuyPrice
+            : null;
+
+
+    public decimal? DifferenceFromTarget => 
+        TargetPrice.HasValue && LivePrice.HasValue
+            ? TargetPrice - LivePrice
+            : null;
+
+
+    public bool? TargetReached =>
+        TargetPrice.HasValue && LivePrice.HasValue
+            ? LivePrice >= TargetPrice
+            : null;
 }
 
 
